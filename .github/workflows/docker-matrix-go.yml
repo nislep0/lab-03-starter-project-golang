@@ -1,0 +1,55 @@
+name: Docker Matrix Build (Go)
+
+on:
+  push:
+    paths:
+      - '**.go'
+      - 'Dockerfile*'
+      - '.github/workflows/docker-matrix-go.yml'
+  workflow_dispatch:
+
+jobs:
+  docker-matrix-go:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        variant: [simple, scratch, distroless]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Start build timer
+        id: start-time
+        run: echo "time=$(date +%s)" >> "$GITHUB_OUTPUT"
+
+      - name: Build Docker image (${{ matrix.variant }})
+        id: build
+        run: |
+          DOCKERFILE="Dockerfile${{ matrix.variant == 'simple' && '' || '.' }}${{ matrix.variant }}"
+          echo "Using Dockerfile: $DOCKERFILE"
+          start=$(date +%s)
+          docker build -t kpi-lab03:${{ matrix.variant }} -f $DOCKERFILE .
+          end=$(date +%s)
+          echo $((end - start)) > build_time.txt
+          docker image inspect kpi-lab03:${{ matrix.variant }} --format='{{.Size}}' > image_size.txt
+
+      - name: End build timer
+        id: end-time
+        run: echo "time=$(date +%s)" >> "$GITHUB_OUTPUT"
+
+      - name: Create report
+        run: |
+          DURATION=$(cat build_time.txt)
+          SIZE=$(cat image_size.txt)
+          echo "Build duration: ${DURATION} seconds" > report-${{ matrix.variant }}.txt
+          echo "Image size: $((SIZE / 1024 / 1024)) MB" >> report-${{ matrix.variant }}.txt
+
+      - name: Upload build report
+        uses: actions/upload-artifact@v3
+        with:
+          name: build-report-${{ matrix.variant }}
+          path: report-${{ matrix.variant }}.txt
