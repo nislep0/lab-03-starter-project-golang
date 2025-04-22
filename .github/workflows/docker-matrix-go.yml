@@ -20,12 +20,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-
-      - name: Verify Docker
-        run: |
-          docker --version
-          docker info
+        uses: docker/setup-buildx-action@v3
 
       - name: Start build timer
         id: start-time
@@ -46,15 +41,17 @@ jobs:
         id: end-time
         run: echo "time=$(date +%s)" >> "$GITHUB_OUTPUT"
 
-      - name: Create report
+      - name: Calculate build stats
         run: |
-          DURATION=$(cat build_time.txt)
+          START=${{ steps.start-time.outputs.time }}
+          END=${{ steps.end-time.outputs.time }}
+          DURATION=$((END - START))
           SIZE=$(cat image_size.txt)
-          echo "Build duration: ${DURATION} seconds" > report-${{ matrix.variant }}.txt
-          echo "Image size: $((SIZE / 1024 / 1024)) MB" >> report-${{ matrix.variant }}.txt
+          SIZE_MB=$((SIZE / 1024 / 1024))
 
-      - name: Upload build report
-        uses: actions/upload-artifact@v3
-        with:
-          name: build-report-${{ matrix.variant }}
-          path: report-${{ matrix.variant }}.txt
+          echo "Variant: ${{ matrix.variant }}"
+          echo "Build time: $DURATION seconds"
+          echo "Image size: $SIZE_MB MB"
+
+      - name: Cleanup
+        run: rm -f image_size.txt
